@@ -9,3 +9,4 @@ This code would need some cleanup for any production use
 - Results as `Result<T, CustomError>` rather than `Result<T, &'static str>`
 - Most of the unit tests are missing
 - `Sync` and `Send` implementation for use with async
+- Forgot to test with odd number of elements and remove the hard coded error

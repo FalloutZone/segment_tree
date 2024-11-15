@@ -45,7 +45,7 @@ pub struct Node {
 struct SegmentTree {
     nodes: Vec<Node>,
     leaf_len: usize,
-    tree_len: usize,
+    //tree_len: usize,
     leaf_indices: Vec<usize>,
 }
 
@@ -61,7 +61,7 @@ impl SegmentTree {
         Ok(SegmentTree {
             nodes,
             leaf_len,
-            tree_len,
+            //tree_len,
             leaf_indices,
         })
     }
@@ -73,10 +73,6 @@ impl SegmentTree {
 
         if input.len() > MAX_INPUT_SIZE {
             return Err("Input size exceeded maximum value");
-        }
-
-        if input.len() % 2 != 0 {
-            return Err("Input length is not an even number");
         }
 
         for i in 0..input.len() {
@@ -150,7 +146,7 @@ impl SegmentTree {
             return Err("Start index is greater than end index")
         }
 
-        if start < 0 || start >= self.leaf_len - 1 {
+        if start > self.leaf_len - 1 {
             return Err("Start index is out of bounds")
         }
 
@@ -226,15 +222,136 @@ mod tests {
 
     #[test]
     fn test_new_segment_tree() {
-        let input = vec![1, 2, 3, 4];
+        let input = vec![1, 2, 3, 4, 5, 6, 7, 8];
         let result = SegmentTree::new(&input);
         assert!(result.is_ok());
     }
 
     #[test]
-    fn test_invalid_input() {
-        let input = vec![1, 2, 3]; // Not power of 2
+    fn test_empty_input() {
+        let input: Vec<isize> = vec![];
         let result = SegmentTree::new(&input);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_input_value_bounds() {
+        let input = vec![MAX_VALUE + 1];
+        let result = SegmentTree::new(&input);
+        assert!(result.is_err());
+
+        let input = vec![MIN_VALUE - 1];
+        let result = SegmentTree::new(&input);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_basic_query() -> Result<(), &'static str> {
+        let input = vec![1, 2, 3, 4, 5, 6, 7, 8];
+        let segment_tree = SegmentTree::new(&input)?;
+
+        assert_eq!(segment_tree.query(0, 7)?, 36); // Sum of all elements
+        assert_eq!(segment_tree.query(0, 3)?, 10); // Sum of first four elements
+        assert_eq!(segment_tree.query(4, 7)?, 26); // Sum of last four elements
+        assert_eq!(segment_tree.query(2, 5)?, 18); // Sum of middle elements
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_invalid_query_range() {
+        let input = vec![1, 2, 3, 4, 5, 6, 7, 8];
+        let segment_tree = SegmentTree::new(&input).unwrap();
+
+        // End index out of bounds
+        assert!(segment_tree.query(0, 8).is_err());
+
+        // Start index greater than end index
+        assert!(segment_tree.query(5, 2).is_err());
+
+        // Start index out of bounds
+        assert!(segment_tree.query(8, 9).is_err());
+    }
+
+    #[test]
+    fn test_basic_update() -> Result<(), &'static str> {
+        let input = vec![1, 2, 3, 4, 5, 6, 7, 8];
+        let mut segment_tree = SegmentTree::new(&input)?;
+
+        // Single value
+        segment_tree.update(3, 10)?;
+        assert_eq!(segment_tree.query(3, 3)?, 10);
+        assert_eq!(segment_tree.query(0, 7)?, 42);
+
+        // Multiple values
+        segment_tree.update(0, 5)?;
+        segment_tree.update(7, 1)?;
+        assert_eq!(segment_tree.query(0, 0)?, 5);
+        assert_eq!(segment_tree.query(7, 7)?, 1);
+        assert_eq!(segment_tree.query(0, 7)?, 39);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_invalid_update() {
+        let input = vec![1, 2, 3, 4, 5, 6, 7, 8];
+        let mut segment_tree = SegmentTree::new(&input).unwrap();
+
+        // Index out of bounds
+        assert!(segment_tree.update(8, 1).is_err());
+
+        // Value exceeds maximum
+        assert!(segment_tree.update(0, MAX_VALUE + 1).is_err());
+
+        // Value below minimum
+        assert!(segment_tree.update(0, MIN_VALUE - 1).is_err());
+    }
+
+    #[test]
+    fn test_consecutive_updates() -> Result<(), &'static str> {
+        let input = vec![1, 2, 3, 4, 5, 6, 7, 8];
+        let mut segment_tree = SegmentTree::new(&input)?;
+
+        // Intermediate results from consecutive updates
+        segment_tree.update(0, 10)?;
+        assert_eq!(segment_tree.query(0, 3)?, 19);
+
+        segment_tree.update(1, 20)?;
+        assert_eq!(segment_tree.query(0, 3)?, 37);
+
+        segment_tree.update(2, 30)?;
+        assert_eq!(segment_tree.query(0, 3)?, 64);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_query_single_element() -> Result<(), &'static str> {
+        let input = vec![1, 2, 3, 4, 5, 6, 7, 8];
+        let segment_tree = SegmentTree::new(&input)?;
+
+        for i in 0..input.len() {
+            assert_eq!(segment_tree.query(i, i)?, input[i]);
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_update_and_query_boundaries() -> Result<(), &'static str> {
+        let input = vec![1, 2, 3, 4, 5, 6, 7, 8];
+        let mut segment_tree = SegmentTree::new(&input)?;
+
+        // Update boundaries
+        segment_tree.update(0, 100)?;
+        segment_tree.update(7, 200)?;
+
+        // Query boundaries
+        assert_eq!(segment_tree.query(0, 0)?, 100);
+        assert_eq!(segment_tree.query(7, 7)?, 200);
+        assert_eq!(segment_tree.query(0, 7)?, 327);
+
+        Ok(())
     }
 }

@@ -6,7 +6,6 @@ Overall, the code is organized and safe.
 
 This code would need some cleanup for any production use
 - Results as `Result<T, CustomError>` rather than `Result<T, &'static str>`
-- `Sync` and `Send` implementation for use with async
 
 # Segment Tree
 

@@ -13,6 +13,8 @@ Implements a basic sum segment tree in Rust
 Overall, the code is organized and safe.
 
 This code would need some cleanup for any production use
+- For large vectors, the recursive nature of the tree could cause a stack overflow
+- Support different operations other than sum
 - Results as `Result<T, E>` rather than `Result<T, &'static str>`
 - `from_iter` - Create a segment tree from an iterator
 - `from_slice` - Create a segment tree from a slice

@@ -1,13 +1,25 @@
 # Segment Tree
-Implements a basic sum segment tree that is safe on any system bit-width. ie 16, 32, 64
+Implements a basic sum segment tree in Rust
+
+## Features
+- Thread safe
+- Safe for any system bit-width
+- `query` - Query the sum of a range
+- `parallel_query` - Query the sum of a range in parallel using system threads
+- `update` - Update a value at a specific index
+- `batch_update` - Update multiple values at specific indices
 
 ## State
 Overall, the code is organized and safe.
 
 This code would need some cleanup for any production use
-- Results as `Result<T, CustomError>` rather than `Result<T, &'static str>`
+- Results as `Result<T, E>` rather than `Result<T, &'static str>`
+- `from_iter` - Create a segment tree from an iterator
+- `from_slice` - Create a segment tree from a slice
+- `from_vec` - Create a segment tree from a vector
+- `from_vec_with_default` - Create a segment tree from a vector with a default value
 
-# Segment Tree
+# Tree Description
 
 A segment tree is a data structure designed to efficiently perform range queries and updates
 on an array of values. It is particularly useful when you need to perform multiple range

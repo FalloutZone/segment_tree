@@ -1,5 +1,7 @@
 /// Segment Tree
 
+use rayon::prelude::*;
+
 // Maximum and minimum values for input elements
 const MAX_VALUE: isize = isize::MAX / 2;
 const MIN_VALUE: isize = isize::MIN / 2;
@@ -20,6 +22,8 @@ pub struct Node {
     pub left: Option<usize>,
     pub right: Option<usize>,
 }
+unsafe impl Send for Node {}
+unsafe impl Sync for Node {}
 
 /// Segment Tree
 /// Structure for the segment tree
@@ -32,6 +36,8 @@ pub struct SegmentTree {
     //tree_len: usize,
     leaf_indices: Vec<usize>,
 }
+unsafe impl Send for SegmentTree {}
+unsafe impl Sync for SegmentTree {}
 
 /// Implementation of the segment tree
 impl SegmentTree {
@@ -194,6 +200,15 @@ impl SegmentTree {
         left_sum + right_sum
     }
 
+    /// Query the segment tree in parallel
+    /// queries: Vector of query ranges
+    /// Returns a vector of query results
+    pub fn parallel_query(&self, queries: &[(usize, usize)]) -> Vec<Result<isize, &'static str>> {
+        queries.par_iter()
+            .map(|(start, end)| self.query(*start, *end))
+            .collect()
+    }
+
     /// Validate update parameters
     /// index: Index of the leaf node to update
     /// new_value: New value for the leaf node
@@ -255,11 +270,21 @@ impl SegmentTree {
             node_idx = parent;
         }
     }
+
+    /// Update leaf nodes in the segment tree in a batch
+    /// updates: Vector of tuples with index and new value
+    pub fn batch_update(&mut self, updates: &[(usize, isize)]) -> Vec<Result<(), &'static str>> {
+        updates.iter()
+            .map(|(index, value)| self.update(*index, *value))
+            .collect()
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Arc;
+    use std::thread;
 
     #[test]
     fn test_new_segment_tree() {
@@ -394,5 +419,133 @@ mod tests {
         assert_eq!(segment_tree.query(0, 7)?, 327);
 
         Ok(())
+    }
+
+    #[test]
+    fn test_send_sync() -> Result<(), &'static str> {
+        let input = vec![1, 2, 3, 4, 5, 6, 7, 8];
+        let segment_tree = Arc::new(SegmentTree::new(&input)?);
+
+        let mut handles = vec![];
+
+        // Spawn multiple threads to read from the segment tree
+        for _ in 0..4 {
+            let tree_clone = Arc::clone(&segment_tree);
+            let handle = thread::spawn(move || {
+                let result = tree_clone.query(0, 7).unwrap();
+                assert_eq!(result, 36);
+            });
+            handles.push(handle);
+        }
+
+        // Wait for threads
+        for handle in handles {
+            handle.join().unwrap();
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_send_sync_mutex() -> Result<(), &'static str> {
+        use std::sync::Mutex;
+
+        let input = vec![1, 2, 3, 4, 5, 6, 7, 8];
+        let segment_tree = Arc::new(Mutex::new(SegmentTree::new(&input)?));
+
+        let mut handles = vec![];
+
+        for i in 0..4 {
+            let tree_clone = Arc::clone(&segment_tree);
+            let handle = thread::spawn(move || {
+                let mut tree = tree_clone.lock().unwrap();
+                tree.update(i, (i + 1) as isize * 10).unwrap();
+            });
+            handles.push(handle);
+        }
+
+        // Wait for threads
+        for handle in handles {
+            handle.join().unwrap();
+        }
+
+        let tree = segment_tree.lock().unwrap();
+        assert_eq!(tree.query(0, 3)?, 100); // 10 + 20 + 30 + 40
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_parallel_queries() -> Result<(), &'static str> {
+        let input = vec![1, 2, 3, 4, 5, 6, 7, 8];
+        let tree = Arc::new(SegmentTree::new(&input)?);
+
+        let queries = vec![
+            (0, 7),  // Full range
+            (0, 3),  // First half
+            (4, 7),  // Second half
+            (2, 5),  // Middle section
+        ];
+
+        let results = tree.parallel_query(&queries);
+
+        assert_eq!(results[0], Ok(36)); // Sum of all elements
+        assert_eq!(results[1], Ok(10)); // Sum of first four
+        assert_eq!(results[2], Ok(26)); // Sum of last four
+        assert_eq!(results[3], Ok(18)); // Sum of middle elements
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_thread_safety() {
+        let input = vec![1, 2, 3, 4, 5, 6, 7, 8];
+        let tree = Arc::new(SegmentTree::new(&input).unwrap());
+
+        let mut handles = vec![];
+
+        for _ in 0..4 {
+            let tree_clone = Arc::clone(&tree);
+            let handle = std::thread::spawn(move || {
+                let queries = vec![(0, 7), (0, 3), (4, 7)];
+                tree_clone.parallel_query(&queries)
+            });
+            handles.push(handle);
+        }
+
+        // Wait for all threads
+        for handle in handles {
+            let results = handle.join().unwrap();
+            assert_eq!(results[0], Ok(36));
+            assert_eq!(results[1], Ok(10));
+            assert_eq!(results[2], Ok(26));
+        }
+    }
+
+    #[test]
+    fn test_performance_comparison() {
+        let input = vec![1; 1_000_000];
+        let tree = Arc::new(SegmentTree::new(&input).unwrap());
+
+        let queries: Vec<(usize, usize)> = (0..1000)
+            .map(|i| (i, i + 1000))
+            .collect();
+
+        // Sequential
+        let start = std::time::Instant::now();
+        let sequential_results: Vec<_> = queries
+            .iter()
+            .map(|(start, end)| tree.query(*start, *end))
+            .collect();
+        let sequential_time = start.elapsed();
+
+        // Parallel
+        let start = std::time::Instant::now();
+        let parallel_results = tree.parallel_query(&queries);
+        let parallel_time = start.elapsed();
+
+        assert_eq!(sequential_results, parallel_results);
+        println!("Sequential time: {:?}", sequential_time); // Sequential time: 1.463208ms
+        println!("Parallel time: {:?}", parallel_time); // Parallel time: 378.75µs
     }
 }
